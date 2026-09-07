@@ -58,8 +58,17 @@ migrates the chain into `docs/features/mvp/`, and runs `git init`.
 Then:
 - **Write ADRs** for decisions already accepted during the intent phase. They currently live only in
   `intent.md`, which is the disposable lane — they must move to the append-only lane to survive.
-- **Freeze the vault notes**: banner on `intent.md` pointing at the repo copy, and flip the vault
-  `README.md` to say the repo now owns the chain.
+- **Freeze the vault notes.** Put this banner — verbatim, so every project matches — at the top of
+  each chain artifact left in the vault (`intent.md`, and `spec.md`/`plan.md` if they were written
+  there), then flip the vault `README.md` to say the repo owns the chain:
+
+  ```markdown
+  > [!warning] Frozen — design-era record
+  > The repo owns this document now: `~/dev/projects/<slug>/docs/features/<feature>/<artifact>.md`.
+  > This copy is the design-era history and is **not** maintained. Make changes in the repo.
+  ```
+
+  Freezing **adds** a banner. Never delete vault content.
 - **Fill in the repo `CLAUDE.md`** with what's actually true — leaving the stub empty wastes the
   always-loaded layer.
 

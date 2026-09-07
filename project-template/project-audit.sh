@@ -75,7 +75,7 @@ audit_project(){
 
   # vault must be frozen once the repo exists
   if [ -d "$vdir" ] && [ -f "$vdir/intent.md" ]; then
-    if grep -q 'FROZEN' "$vdir/intent.md"; then ok "vault notes frozen"
+    if grep -qi 'frozen' "$vdir/intent.md"; then ok "vault notes frozen"
     else
       local dup; dup=$(cd "$vdir" && ls intent.md spec.md plan.md 2>/dev/null | tr '\n' ' ')
       bad "repo exists but vault is NOT frozen — live duplicates in the vault: ${dup:-intent.md}"
