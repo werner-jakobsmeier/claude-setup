@@ -89,12 +89,17 @@ audit_project(){
   local rem; rem=$(git -C "$dir" remote get-url origin 2>/dev/null || true)
   if [ -n "$rem" ]; then
     local nwo; nwo=$(printf '%s' "$rem" | sed -E 's|^git@github.com:||; s|^https://github.com/||; s|\.git$||')
-    local rs; rs=$(gh api "repos/$nwo/rulesets" --jq 'length' 2>/dev/null || echo "denied")
-    case "$rs" in
-      denied) skip "ruleset unavailable on this plan (private repo, needs GitHub Pro) — local guards are all there is" ;;
-      0)      bad  "ruleset AVAILABLE but none enabled — this repo can be sealed server-side for free" ;;
-      *)      ok   "GitHub ruleset present ($rs) — main enforced server-side" ;;
-    esac
+    # gh writes the 403 body to stdout, so a bare capture looks like success. Demand an integer.
+    local rs
+    if rs=$(gh api "repos/$nwo/rulesets" --jq 'length' 2>/dev/null) && [ -n "$rs" ] && case "$rs" in ''"''"''|*[!0-9]*) false ;; *) true ;; esac; then
+      if [ "$rs" -eq 0 ]; then
+        bad "ruleset AVAILABLE but none enabled — this repo can be sealed server-side for free"
+      else
+        ok "GitHub ruleset active ($rs) — direct pushes to main rejected server-side"
+      fi
+    else
+      skip "ruleset unavailable on this plan (private repo needs GitHub Pro) — local guards are all there is"
+    fi
   else
     skip "no git remote yet — nothing to protect server-side"
   fi
