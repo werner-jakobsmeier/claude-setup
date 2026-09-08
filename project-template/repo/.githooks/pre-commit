@@ -1,0 +1,38 @@
+#!/bin/bash
+# Refuse to create a commit while main is checked out.
+#
+# pre-push stops a branch reaching origin/main, but nothing stopped a commit
+# being made ON main in the first place — leaving work stranded on a branch that
+# can never be pushed. Together the two hooks mean code reaches main only by
+# merging a pull request.
+#
+# Not run for merge commits (git skips pre-commit during a merge), so a
+# `git pull` that fast-forwards or merges origin/main is unaffected.
+#
+# Deliberate override: ALLOW_MAIN=1 git commit …   (or --no-verify)
+set -u
+PROTECTED="main"
+# symbolic-ref works on an unborn branch; rev-parse does not. Using rev-parse here meant the
+# hook silently exited 0 on a brand-new repo, so the guard was absent exactly when a repo is
+# most likely to get a stray commit on main.
+branch=$(git symbolic-ref --short HEAD 2>/dev/null) || exit 0   # detached HEAD: not our business
+[ "$branch" = "$PROTECTED" ] || exit 0
+[ "${ALLOW_MAIN:-}" = "1" ] && exit 0
+
+# The root commit is allowed deliberately: there is nothing to branch from and nothing to open a
+# pull request against yet. Every commit after it is gated.
+git rev-parse --verify HEAD >/dev/null 2>&1 || exit 0
+
+cat >&2 <<MSG
+
+  ✗ Refusing to commit on '$PROTECTED'.
+
+    Code reaches main only by merging a pull request. Move this work to a branch:
+
+      git switch -c feat/your-change      # the staged changes come with you
+      git commit
+
+    Deliberate override:  ALLOW_MAIN=1 git commit …
+
+MSG
+exit 1

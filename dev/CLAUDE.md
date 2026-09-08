@@ -48,14 +48,42 @@ Hand-writing these produces variants — it has happened. If a convention needs 
 
 Slugs are lowercase-kebab and match the vault folder, the repo folder, and `~/dev/projects/<slug>`.
 
-## 4. What is and isn't standardised
+## 4. Branching — code reaches `main` only through a pull request
+
+**Never commit or push directly to `main`.** This applies to every repo under `~/dev/projects`,
+including tooling repos, and it applies to Claude as much as to a person.
+
+```bash
+git switch -c <type>/<short-kebab-summary>   # spike | feat | fix | docs | chore
+# … work …
+git fetch origin && git rebase origin/main
+git push -u origin HEAD
+gh pr create                                  # then squash-merge
+```
+
+Rebase rather than merging main into a branch; squash on merge so main reads as one commit per change.
+One PR per reviewable idea, not per phase.
+
+**Why, for a one-person project:** the pull request is the only moment `REVIEW.md`'s documentation
+trigger actually fires — *does this change alter behaviour described in `docs/`? then `docs/` changes
+in this PR*. No PR means no checkpoint, and the structure decays no matter how good it is.
+
+Enforcement is layered, and each layer is bypassable except the first:
+`.githooks/pre-commit` and `pre-push` (need `core.hooksPath .githooks` — `new-project.sh repo` sets it),
+`.github/workflows/guard-main.yml` as a post-hoc CI backstop, and `~/.claude/hooks/block-main-commits.sh`
+for Claude. **A GitHub ruleset requiring a PR is the only real enforcement** — free on public repos,
+GitHub Pro on private ones. Enable it wherever it is available; it makes the rest redundant.
+
+Each repo's `CONTRIBUTING.md` carries the detail.
+
+## 5. What is and isn't standardised
 
 **Standardised:** process, documentation structure, scaffolding.
 **Deliberately NOT standardised: the stack.** group-event-newsletter is TanStack Start (SSR);
 workout-tracker is a Vite SPA by explicit decision (ADR 0001). **Never force stack consistency
 between projects** — each has reasons recorded in its ADRs. Read them before proposing a change.
 
-## 5. Writing style
+## 6. Writing style
 
 Concise. State the decision and the constraint; cut restated rationale. Prefer a table over prose
 when comparing options. Don't pad documents to look thorough.

@@ -73,6 +73,37 @@ audit_project(){
                       || bad "app code exists but NO plan.md — code was written before its gate"
   fi
 
+  # branching guards — code reaches main only through a pull request
+  local hp; hp=$(git -C "$dir" config core.hooksPath 2>/dev/null || true)
+  [ "$hp" = ".githooks" ] && ok "core.hooksPath -> .githooks" \
+    || bad "core.hooksPath is '${hp:-unset}' — local main guards are INERT. Fix: (cd $dir && ./scripts/setup.sh)"
+  local missing=""
+  for f in .githooks/pre-commit .githooks/pre-push scripts/setup.sh CONTRIBUTING.md .github/workflows/guard-main.yml; do
+    [ -f "$dir/$f" ] || missing="$missing $f"
+  done
+  [ -z "$missing" ] && ok "branching guard files present" || bad "missing guard files:$missing"
+  for f in .githooks/pre-commit .githooks/pre-push scripts/setup.sh; do
+    [ -f "$dir/$f" ] && [ ! -x "$dir/$f" ] && bad "$f is not executable — it will never run"
+  done
+  # the only unbypassable layer: a GitHub ruleset requiring a pull request
+  local rem; rem=$(git -C "$dir" remote get-url origin 2>/dev/null || true)
+  if [ -n "$rem" ]; then
+    local nwo; nwo=$(printf '%s' "$rem" | sed -E 's|^git@github.com:||; s|^https://github.com/||; s|\.git$||')
+    # gh writes the 403 body to stdout, so a bare capture looks like success. Demand an integer.
+    local rs
+    if rs=$(gh api "repos/$nwo/rulesets" --jq 'length' 2>/dev/null) && [ -n "$rs" ] && case "$rs" in ''"''"''|*[!0-9]*) false ;; *) true ;; esac; then
+      if [ "$rs" -eq 0 ]; then
+        bad "ruleset AVAILABLE but none enabled — this repo can be sealed server-side for free"
+      else
+        ok "GitHub ruleset active ($rs) — direct pushes to main rejected server-side"
+      fi
+    else
+      skip "ruleset unavailable on this plan (private repo needs GitHub Pro) — local guards are all there is"
+    fi
+  else
+    skip "no git remote yet — nothing to protect server-side"
+  fi
+
   # vault must be frozen once the repo exists
   if [ -d "$vdir" ] && [ -f "$vdir/intent.md" ]; then
     if grep -qi 'frozen' "$vdir/intent.md"; then ok "vault notes frozen"
@@ -104,7 +135,7 @@ else
     [[ "$s" =~ ^[a-z0-9-]+$ ]] || continue          # only slug-shaped (playbook-era) folders
     if [ ! -d "$CODE/$s" ]; then
       found=1
-      if grep -qiE '^\*\*Status\*\*:.*accept' "$d/intent.md" 2>/dev/null; then
+      if grep -qiE '^\*\*Status\*\*:.*\baccepted\b' "$d/intent.md" 2>/dev/null; then
         bad "vault '$s': intent is accepted but no repo — promote it: new-project.sh repo $s"
       else
         skip "vault '$s': design phase, no repo yet (correct until the intent is accepted)"

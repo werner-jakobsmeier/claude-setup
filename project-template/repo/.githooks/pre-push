@@ -1,0 +1,30 @@
+#!/bin/bash
+# Refuse a direct push to main.
+#
+# GitHub cannot enforce this for us: branch protection and rulesets require
+# GitHub Pro on a private repository, and this one is private on purpose. So the
+# rule lives here instead. It is honour-system — `--no-verify` bypasses it — but
+# it turns an accidental push into a deliberate one, which is the whole point.
+set -u
+PROTECTED="main"
+
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  if [ "$remote_ref" = "refs/heads/$PROTECTED" ]; then
+    cat >&2 <<MSG
+
+  ✗ Refusing to push directly to '$PROTECTED'.
+
+    Changes reach main through a pull request — that is where the REVIEW.md
+    documentation trigger actually fires.
+
+      git switch -c feat/your-change
+      git push -u origin HEAD
+      gh pr create
+
+    Deliberate override:  git push --no-verify
+
+MSG
+    exit 1
+  fi
+done
+exit 0
