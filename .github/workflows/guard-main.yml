@@ -1,0 +1,33 @@
+name: Guard main
+
+# A ruleset requiring a pull request is the real enforcement, but it needs GitHub Pro on a
+# private repository (free on public ones). Where it is unavailable, prevention lives in
+# local git hooks, which are bypassable (--no-verify) and absent in a fresh clone that has
+# not run scripts/setup.sh. This workflow is the backstop: it cannot stop a direct push,
+# but it makes one loud and immediate instead of silent.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  from-pull-request:
+    name: Commit must come from a merged PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the pushed commit is associated with a pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          sha='${{ github.sha }}'
+          count=$(gh api "repos/${{ github.repository }}/commits/$sha/pulls" --jq 'length')
+          if [ "$count" -eq 0 ]; then
+            echo "::error title=Direct push to main::Commit $sha reached main without a pull request. Revert it and re-land the change through a PR, and check that scripts/setup.sh has been run on the machine that pushed."
+            exit 1
+          fi
+          echo "OK — $sha came from a pull request."

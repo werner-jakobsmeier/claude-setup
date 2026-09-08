@@ -14,7 +14,7 @@ die(){ echo "error: $*" >&2; exit 1; }
 
 # Files the project fills in with its own content. Sync will create them if missing, but never
 # overwrites or reports them — differing from the template stub is their expected state.
-SEEDED="CLAUDE.md docs/architecture.md docs/data-model.md"
+SEEDED="CLAUDE.md CONTRIBUTING.md docs/architecture.md docs/data-model.md"
 is_seeded(){ case " $SEEDED " in *" $1 "*) return 0;; *) return 1;; esac; }
 stamp(){ sed -i '' -e "s|{{SLUG}}|$1|g" -e "s|{{TITLE}}|$2|g" "$3"; }
 
@@ -71,6 +71,8 @@ case "$cmd" in
       echo "  $a.md -> docs/features/mvp/ (vault copy frozen)"
     done
     [ -d "$dest/.git" ] || (cd "$dest" && git init -q && echo "  git initialised")
+    # hooks are not cloned, and scripts/setup.sh is easy to forget — wire them now
+    (cd "$dest" && git config core.hooksPath .githooks) && echo "  core.hooksPath -> .githooks (no commits or pushes on main)"
     echo "repo docs skeleton ready: ~/dev/projects/$slug"
     echo "next: freeze the vault notes as the design-era record; stack scaffolding is per-project"
     ;;
