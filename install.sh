@@ -31,6 +31,19 @@ settings="$HOME/.claude/settings.json"
 [ -f "$settings" ] || echo '{}' > "$settings"
 frag=$(mktemp); merged=$(mktemp)
 sed "s|__REPO__|$R|" "$R/claude/settings-hooks.json" > "$frag"
+# `jq '.[0] * .[1]'` deep-merges objects but REPLACES arrays, and hooks live in
+# arrays — so any hook entry in settings.json that this fragment does not also
+# declare is silently dropped. That has actually happened: a hook added by hand
+# vanished on the next install with no warning. Name the casualties first.
+dropped=$(jq -r --slurpfile f "$frag" '
+  [ .hooks // {} | to_entries[] | .key as $ev | .value[]?.hooks[]?.command ] as $have
+  | [ $f[0].hooks // {} | to_entries[] | .value[]?.hooks[]?.command ] as $keep
+  | $have - $keep | .[]' "$settings" 2>/dev/null | sed "s|^|    |")
+if [ -n "$dropped" ]; then
+  echo "  WARN    these hooks are in settings.json but not in settings-hooks.json;" >&2
+  echo "          the merge below will remove them. Add them to the fragment to keep them:" >&2
+  echo "$dropped" >&2
+fi
 if jq -s '.[0] * .[1]' "$settings" "$frag" > "$merged" 2>/dev/null; then
   if [ "$(jq -S . "$settings")" = "$(jq -S . "$merged")" ]; then echo "  ok      $settings (hooks already merged)"
   else cp "$settings" "$settings.bak-$(date +%Y%m%d-%H%M%S)"

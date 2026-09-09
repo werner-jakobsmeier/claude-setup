@@ -11,6 +11,31 @@
             "statusMessage": "SDLC plan gate"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__REPO__/claude/hooks/block-main-commits.sh",
+            "if": "Bash(git *)",
+            "timeout": 10,
+            "statusMessage": "Checking branch"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__REPO__/claude/hooks/rebuild-generated.sh",
+            "async": true,
+            "statusMessage": "Rebuilding generated files"
+          }
+        ]
       }
     ]
   }
