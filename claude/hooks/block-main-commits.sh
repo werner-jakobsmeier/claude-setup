@@ -36,6 +36,14 @@ dir=${dir//\$HOME/$HOME}
 root=$(cd "$dir" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null) || exit 0
 branch=$(cd "$root" && git symbolic-ref --short HEAD 2>/dev/null) || exit 0
 
+# A command may move off main before committing — `git switch -c feat/x && git commit`
+# is the correct workflow, not a violation. The hook runs before any of it executes,
+# so honour the last branch the command itself switches to.
+switched=$(printf '%s\n' "$cmd" \
+  | grep -oE 'git[[:space:]]+(switch|checkout)[[:space:]]+(-[a-zA-Z]+[[:space:]]+)*[^[:space:];&|]+' \
+  | sed -E 's/.*[[:space:]]//' | grep -vE '^-' | tail -1)
+[ -n "$switched" ] && branch="$switched"
+
 blocked=""
 while IFS= read -r inv; do
   [ -n "$inv" ] || continue
