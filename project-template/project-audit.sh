@@ -93,7 +93,7 @@ audit_project(){
     local rs
     if rs=$(gh api "repos/$nwo/rulesets" --jq 'length' 2>/dev/null) && [ -n "$rs" ] && case "$rs" in ''"''"''|*[!0-9]*) false ;; *) true ;; esac; then
       if [ "$rs" -eq 0 ]; then
-        bad "ruleset AVAILABLE but none enabled — this repo can be sealed server-side for free"
+        bad "ruleset AVAILABLE but none enabled — run: new-project.sh protect <slug>"
       else
         ok "GitHub ruleset active ($rs) — direct pushes to main rejected server-side"
       fi
