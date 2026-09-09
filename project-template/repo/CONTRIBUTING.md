@@ -82,24 +82,34 @@ The Claude Code hooks live in `~/.claude/settings.json`, outside this repo, beca
 sessions rooted anywhere, not only from a session opened in this directory. They are versioned in
 [claude-setup](https://github.com/werner-jakobsmeier/claude-setup).
 
-### The honest limit
+### What is actually unbypassable
 
-**A GitHub ruleset requiring a pull request is the only unbypassable enforcement.** It is free on
-**public** repositories and requires GitHub Pro (~$4/month) on **private** ones.
+**A GitHub ruleset requiring a pull request is the enforcement.** A direct push to `main` is
+rejected by the server:
 
-Check which applies here:
-
-```bash
-gh api repos/OWNER/REPO/rulesets --jq 'length'   # 403 => unavailable on this plan
+```
+remote: error: GH013: Repository rule violations found for refs/heads/main.
+ ! [remote rejected] main -> main (push declined due to repository rule violations)
 ```
 
-**If it is available, enable it — it makes everything below redundant.** If it isn't:
+`--no-verify` does not help, and a clone that never ran `scripts/setup.sh` is covered too. The
+ruleset is applied at repo creation by `new-project.sh github <slug>`, and can be re-applied — or
+repaired if someone edits it in the GitHub UI — at any time:
 
-- every local guard is bypassable with `--no-verify` or `ALLOW_MAIN=1`;
-- none of them exist in a clone that hasn't run `scripts/setup.sh`;
-- the CI job catches a direct push *after* it lands, not before.
+```bash
+~/dev/projects/_project-template/new-project.sh protect <slug>
+```
 
-That stack makes a direct push to main deliberate, and loud if it happens anyway — but not impossible.
+It is free on **public** repositories and needs GitHub Pro on **private** ones. Pro is active on
+this account, so every repo is sealed the same way; the policy itself is versioned at
+`project-template/repo-ruleset.json`, so the repos cannot drift apart.
+
+**Everything above this section is fast local feedback, not the guarantee.** Those layers stop a
+mistake in a second at the keyboard rather than thirty seconds later at the remote, and they still
+catch the case a ruleset cannot see — a commit made *on* main, which strands work on a branch that
+can never be pushed. They remain bypassable (`--no-verify`, `ALLOW_MAIN=1`) and absent in a fresh
+clone. That is now acceptable, because they are no longer the only thing between a mistake and
+`main`.
 
 ## Documentation rules
 
