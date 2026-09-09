@@ -8,8 +8,15 @@
 set -u
 PROTECTED="main"
 
-while read -r _local_ref _local_sha remote_ref _remote_sha; do
+while read -r _local_ref _local_sha remote_ref remote_sha; do
   if [ "$remote_ref" = "refs/heads/$PROTECTED" ]; then
+    # An all-zero remote sha means the branch does not exist yet, so this push creates it.
+    # There is nothing to open a pull request against — mirror pre-commit's root-commit
+    # exemption rather than making the first push of every new repo require --no-verify.
+    case "$remote_sha" in
+      *[!0]*) ;;        # real sha: the branch exists, fall through and refuse
+      *) continue ;;    # creating the branch: allow
+    esac
     cat >&2 <<MSG
 
   ✗ Refusing to push directly to '$PROTECTED'.

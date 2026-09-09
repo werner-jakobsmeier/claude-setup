@@ -143,8 +143,25 @@ case "$cmd" in
     case "${3:-}" in --public) vis="--public" ;; esac
     if gh repo view "$slug" >/dev/null 2>&1; then
       echo "  GitHub repo already exists: $slug"
+      owner=$(gh api user --jq .login)
       (cd "$dest" && git remote get-url origin >/dev/null 2>&1) ||
-        (cd "$dest" && gh repo set-default "$slug" >/dev/null 2>&1 || true)
+        (cd "$dest" && git remote add origin "git@github.com:$owner/$slug.git")
+      # The repo can exist but be empty — an earlier attempt may have created it and then failed
+      # to push. Protecting an empty repo strands it: nothing can reach main, and there is no base
+      # branch to open a pull request against. So push first, dropping the ruleset if one is
+      # already in the way, and let protect_main below re-apply it.
+      if [ -z "$(cd "$dest" && git ls-remote --heads origin main 2>/dev/null)" ]; then
+        echo "  remote has no main yet — bootstrapping"
+        rs=$(gh api "repos/$owner/$slug/rulesets" --jq '.[0].id // empty' 2>/dev/null || true)
+        if [ -n "$rs" ]; then
+          gh api -X DELETE "repos/$owner/$slug/rulesets/$rs" >/dev/null 2>&1 &&
+            echo "  temporarily removed ruleset $rs so the first push can land"
+        fi
+        # The very first commit cannot arrive by pull request; this is the one legitimate
+        # direct push to main, and protect_main seals the branch immediately afterwards.
+        (cd "$dest" && ALLOW_MAIN=1 git push -u origin main) || die "bootstrap push failed"
+        echo "  pushed main"
+      fi
     else
       (cd "$dest" && gh repo create "$slug" $vis --source=. --remote=origin --push) ||
         die "could not create the GitHub repo"
