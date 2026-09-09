@@ -37,16 +37,25 @@ root=$(cd "$dir" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null) || ex
 branch=$(cd "$root" && git symbolic-ref --short HEAD 2>/dev/null) || exit 0
 
 # A command may move off main before committing — `git switch -c feat/x && git commit`
-# is the correct workflow, not a violation. The hook runs before any of it executes,
-# so honour the last branch the command itself switches to.
-switched=$(printf '%s\n' "$cmd" \
-  | grep -oE 'git[[:space:]]+(switch|checkout)[[:space:]]+(-[a-zA-Z]+[[:space:]]+)*[^[:space:];&|]+' \
-  | sed -E 's/.*[[:space:]]//' | grep -vE '^-' | tail -1)
-[ -n "$switched" ] && branch="$switched"
+# is the correct workflow, not a violation. The hook runs before any of it executes, so
+# replay the command's own branch switches IN ORDER, applying each only to the invocations
+# that follow it. Taking the last switch globally was wrong: `git push && git switch main`
+# tidies up *after* pushing from a feature branch, and was read as a push from main.
+ops=$(printf '%s\n' "$cmd" \
+  | grep -oE '(^|[;&|(]|&&)[[:space:]]*git[[:space:]]+(switch|checkout|commit|push)([[:space:]][^&;|]*)?' \
+  | sed -E 's/^[;&|(]*[[:space:]]*//')
 
 blocked=""
 while IFS= read -r inv; do
   [ -n "$inv" ] || continue
+  case "$inv" in
+    "git switch"*|"git checkout"*)
+      to=$(printf '%s' "$inv" | sed -E 's/^git[[:space:]]+(switch|checkout)[[:space:]]+//' \
+           | tr ' ' '\n' | grep -vE '^-' | head -1)
+      [ -n "$to" ] && branch="$to"
+      continue
+      ;;
+  esac
   case "$inv" in
     "git commit"*)
       [ "$branch" = "main" ] && { blocked="commit on main"; break; }
@@ -61,7 +70,7 @@ while IFS= read -r inv; do
       fi
       ;;
   esac
-done <<< "$invocations"
+done <<< "$ops"
 [ -n "$blocked" ] || exit 0
 
 jq -cn --arg b "$blocked" --arg r "$(basename "$root")" \
