@@ -36,4 +36,16 @@ t "template"                     "$(w "$H/dev/projects/_project-template/repo/x.
 t "outside ~/dev/projects"       "$(w "$H/Claude/scratch.ts")"                      ALLOW
 t "unrelated tool"               '{"tool_name":"Read","tool_input":{"file_path":"/etc/hosts"}}' ALLOW
 
+# --- false positives fixed 2026-09-10 ---------------------------------------------
+# A quoted redirect target followed by 2>&1: stripping the quotes must not leave the
+# '>' to re-pair with the "2" and read it as a file named "2" under the cwd.
+t "2>&1 after quoted target"     "$(bc 'git show HEAD:f > "/tmp/out" 2>&1' "$WT")"   ALLOW
+t "2>&1, unexpanded \$var target" "$(bc 'tail -c 9 "$V/x.md" > "$S/o.md" 2>&1' "$WT")" ALLOW
+t "2>&1, redirect into repo"     "$(bc 'git show HEAD:f > "'"$WT"'/gen.ts" 2>&1' "$H")" DENY
+# Heredoc bodies are data: a Markdown '>' line or a path in prose there is not a write.
+t "heredoc markdown blockquote"  "$(bc "$(printf 'python3 - <<%sPY%s\n> The repo at ~/dev/projects/workout-tracker/src\nPY' "'" "'")" "$WT")" ALLOW
+t "heredoc names a repo path"    "$(bc "$(printf 'cat <<EOF\nsee %s/dev/projects/workout-tracker/src/app.ts\nEOF' "$H")" "$WT")" ALLOW
+# ...but a real redirect on the heredoc opener line is still caught.
+t "real redirect + heredoc stdin" "$(bc "$(printf 'cat > %s/src/gen.ts <<%sEOF%s\ncode\nEOF' "$WT" "'" "'")" "$H")" DENY
+
 echo; echo "$pass passed, $fail failed"; [ "$fail" -eq 0 ]
